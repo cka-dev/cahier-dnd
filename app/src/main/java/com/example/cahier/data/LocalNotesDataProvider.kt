@@ -1,4 +1,4 @@
-package com.example.cahierreview.data
+package com.example.cahier.data
 
 import java.time.LocalDate
 

@@ -1,4 +1,4 @@
-package com.example.cahierreview
+package com.example.cahier
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,9 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.example.cahierreview.data.LocalNotesDataProvider
-import com.example.cahierreview.ui.HomePane
-import com.example.cahierreview.ui.theme.CahierReviewTheme
+import com.example.cahier.ui.HomePane
+import com.example.cahier.ui.theme.CahierReviewTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,7 +19,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HomePane(notes = LocalNotesDataProvider.allNotes)
+                    HomePane()
                 }
             }
         }

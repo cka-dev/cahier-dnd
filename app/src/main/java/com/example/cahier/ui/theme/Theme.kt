@@ -1,4 +1,4 @@
-package com.example.cahierreview.ui.theme
+package com.example.cahier.ui.theme
 
 import android.app.Activity
 import android.os.Build

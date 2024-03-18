@@ -1,4 +1,4 @@
-package com.example.cahierreview.ui.theme
+package com.example.cahier.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

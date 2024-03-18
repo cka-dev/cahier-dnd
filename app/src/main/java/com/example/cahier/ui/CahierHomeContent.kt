@@ -1,58 +1,28 @@
-package com.example.cahierreview.ui
+package com.example.cahier.ui
 
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeFloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.cahierreview.data.Note
-import com.example.myapplication.R
+import com.example.cahier.R
+import com.example.cahier.data.Note
 import java.time.format.DateTimeFormatter
 
-@Composable
-fun HomePane(
-    notes: List<Note>,
-    modifier: Modifier = Modifier
-) {
-    Scaffold(
-        floatingActionButton = {
-            LargeFloatingActionButton(onClick = { /*TODO*/ }) {
-                Icon(
-                    Icons.Filled.Add,
-                    stringResource(R.string.floating_action_button_des)
-                )
-            }
-        },
-        modifier = modifier
-    ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(184.dp),
-            modifier.padding(innerPadding)
-        )
-        {
-            items(notes.size) { note ->
-                NoteItem(note = notes[note])
-            }
-        }
-    }
-}
 
 @Composable
 fun NoteItem(
@@ -78,4 +48,18 @@ fun NoteItem(
             Text(formattedDate.toString())
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CahierTopAppBar() {
+    TopAppBar(
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.DarkGray,
+            titleContentColor = Color.White
+        ),
+        title = {
+            Text(stringResource(R.string.all_notes))
+        }
+    )
 }
