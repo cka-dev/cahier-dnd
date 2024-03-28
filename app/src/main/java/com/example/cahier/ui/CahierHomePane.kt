@@ -20,7 +20,7 @@ import com.example.cahier.R
 @Composable
 fun HomePane(
     modifier: Modifier = Modifier,
-    viewModel: ViewModel = viewModel()
+    viewModel: HomePaneViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     Scaffold(
