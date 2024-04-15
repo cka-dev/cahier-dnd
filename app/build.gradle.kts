@@ -60,7 +60,18 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // Adaptive layouts dependencies
+    implementation(libs.androidx.material3.adaptive.navigation.suite.android)
+    implementation(libs.androidx.adaptive.android)
+    implementation(libs.androidx.adaptive.layout.android)
+    implementation(libs.androidx.adaptive.navigation.android)
+    implementation(libs.androidx.adaptive)
+    implementation(libs.androidx.navigation.runtime.ktx)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.window.core)
+
     testImplementation(libs.junit)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
