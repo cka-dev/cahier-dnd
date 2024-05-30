@@ -3,6 +3,8 @@ package com.example.cahier.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -11,10 +13,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeFloatingActionButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
@@ -22,47 +26,42 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cahier.R
 import com.example.cahier.data.Note
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun NoteList(
-    onButtonClick: () -> Unit,
-    onItemClick: (Note) -> Unit,
+    noteList: List<Note>,
+    onAddNewNote: () -> Unit,
+    onNoteClick: (Note) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: HomePaneViewModel = viewModel()
+    onDelete: () -> Unit = {}
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-
-    Scaffold(
-        topBar = {
-            TopAppBar(currentScreenName = stringResource(R.string.all_notes))
-        },
-        floatingActionButton = {
-            LargeFloatingActionButton(onClick = onButtonClick) {
-                Icon(Icons.Filled.Add, stringResource(R.string.floating_action_button_des))
-            }
-        },
-        modifier = modifier
+    Scaffold(topBar = {
+        HomeTopAppBar(onDelete = onDelete, currentScreenName = stringResource(R.string.home))
+    }, floatingActionButton = {
+        IconButton(
+            onClick = onAddNewNote,
+            colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.primary),
+        ) {
+            Icon(Icons.Filled.Add, stringResource(R.string.floating_action_button_des))
+        }
+    }, modifier = modifier
     ) { innerPadding ->
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(184.dp),
-            Modifier.padding(innerPadding)
-        )
-        {
-            items(uiState.notesCount) { note ->
+            columns = GridCells.Adaptive(184.dp), Modifier.padding(innerPadding)
+        ) {
+            items(
+                count = noteList.size,
+                key = { index -> noteList[index].id }
+            ) { index ->
                 NoteItem(
-                    note = uiState.notes[note],
-                    onClick = onItemClick
+                    note = noteList[index], onNoteClick = onNoteClick
                 )
             }
         }
@@ -72,50 +71,38 @@ fun NoteList(
 @Composable
 fun NoteDetail(
     note: Note,
+    onDelete: () -> Unit,
+    onClickToEdit: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val date = note.lastModified
-    val formatter = DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern))
-    val formattedDate = date.format(formatter)
-
-    Scaffold(
-        topBar = {
-            TopAppBar(currentScreenName = note.title)
-        }
-    ) { paddingValues ->
-        Column(modifier = modifier.padding(paddingValues)) {
-            Text(formattedDate)
+    Scaffold(topBar = {
+        NoteTopAppBar(onDelete = onDelete, currentScreenName = note.title)
+    }) { paddingValues ->
+        Column(modifier = modifier
+            .clickable { onClickToEdit(note) }
+            .padding(paddingValues)
+        ) {
             Text(note.title)
             note.text?.let { Text(it) }
-            note.image?.let { painterResource(it) }
-                ?.let {
-                    Image(
-                        painter = it,
-                        contentDescription = note.title
-                    )
-                }
+            note.image?.let { painterResource(it) }?.let {
+                Image(
+                    painter = it, contentDescription = note.title
+                )
+            }
         }
     }
 }
 
 @Composable
 fun NoteItem(
-    onClick: (Note) -> Unit,
-    note: Note,
-    modifier: Modifier = Modifier
+    onNoteClick: (Note) -> Unit, note: Note, modifier: Modifier = Modifier
 ) {
-    val date = note.lastModified
-    val formatter = DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern))
-    val formattedDate = date.format(formatter)
-
-    OutlinedCard(
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+    OutlinedCard(elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         colors = CardDefaults.cardColors(MaterialTheme.colorScheme.onPrimary),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .padding(6.dp)
-            .clickable { onClick(note) }
-    ) {
+            .clickable { onNoteClick(note) }) {
         Image(
             painterResource(R.drawable.media),
             contentDescription = null,
@@ -125,21 +112,46 @@ fun NoteItem(
         )
         Column(modifier.padding(16.dp)) {
             Text(note.title)
-            Text(formattedDate.toString())
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopAppBar(currentScreenName: String) {
+fun NoteTopAppBar(
+    onDelete: () -> Unit,
+    currentScreenName: String
+) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.DarkGray,
-            titleContentColor = Color.White
-        ),
-        title = {
+            containerColor = Color.DarkGray, titleContentColor = Color.White
+        ), title = {
+            Row {
+                Text(currentScreenName)
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { onDelete() },
+                    content = {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.floating_action_button_des),
+                        )
+                    })
+            }
+        })
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeTopAppBar(
+    onDelete: () -> Unit,
+    currentScreenName: String
+) {
+    TopAppBar(colors = TopAppBarDefaults.topAppBarColors(
+        containerColor = Color.DarkGray, titleContentColor = Color.White
+    ), title = {
+        Row {
             Text(currentScreenName)
         }
-    )
+    })
 }

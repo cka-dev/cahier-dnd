@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -8,7 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.example.cahier"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -47,6 +48,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    namespace = "com.example.cahier"
 }
 
 dependencies {
@@ -60,15 +62,19 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    // Adaptive layouts dependencies
-    implementation(libs.androidx.material3.adaptive.navigation.suite.android)
-    implementation(libs.androidx.adaptive.android)
-    implementation(libs.androidx.adaptive.layout.android)
-    implementation(libs.androidx.adaptive.navigation.android)
-    implementation(libs.androidx.adaptive)
     implementation(libs.androidx.navigation.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.window.core)
+    implementation(libs.androidx.foundation)
+
+    // Adaptive layouts dependencies
+    implementation(libs.material3.adaptive.navigation.suite.android)
+    implementation(libs.androidx.adaptive.navigation.android)
+
+    //Room
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
 
     testImplementation(libs.junit)
 

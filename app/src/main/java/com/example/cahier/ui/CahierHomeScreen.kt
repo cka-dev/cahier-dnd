@@ -13,7 +13,6 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
-import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -26,7 +25,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cahier.R
+import com.example.cahier.navigation.NavigationDestination
+import com.example.cahier.ui.viewmodels.AppViewModelProvider
+import com.example.cahier.ui.viewmodels.HomeScreenViewModel
 
+object HomeDestination : NavigationDestination {
+    override val route = "home"
+}
 
 enum class AppDestinations(
     @StringRes val label: Int,
@@ -55,13 +60,22 @@ enum class AppDestinations(
     )
 }
 
-@OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class)
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
-fun HomeScreen(
-    onButtonClick: () -> Unit,
-    modifier: Modifier = Modifier
+fun HomePane(
+    navigateToCanvas: (Long) -> Unit,
+    navigateUp: () -> Unit,
+    modifier: Modifier = Modifier,
+    homeScreenViewModel: HomeScreenViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    val navigator = rememberListDetailPaneScaffoldNavigator<Nothing>()
+    val noteList by homeScreenViewModel.noteList.collectAsState()
+    val selectedNote by homeScreenViewModel.uiState.collectAsState()
+
+    BackHandler(navigator.canNavigateBack()) {
+        navigator.navigateBack()
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -80,39 +94,37 @@ fun HomeScreen(
             }
         },
     ) {
-        NoteListAndDetailPane(onButtonClick = onButtonClick)
+        ListDetailPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            value = navigator.scaffoldValue,
+            listPane = {
+                NoteList(
+                    noteList = noteList.noteList,
+                    onNoteClick = {
+                        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)
+                        homeScreenViewModel.selectNote(it.id)
+                    },
+                    onAddNewNote = {
+                        homeScreenViewModel.addNote { it ->
+                            navigateToCanvas(it)
+                        }
+                    }
+                )
+            },
+            detailPane = {
+                selectedNote?.let { it ->
+                    NoteDetail(
+                        note = it,
+                        onDelete = {
+                            homeScreenViewModel.deleteNote()
+                            navigateUp()
+                        },
+                        onClickToEdit = {
+                            navigateToCanvas(it.id)
+                        }
+                    )
+                }
+            }
+        )
     }
-}
-
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
-@Composable
-fun NoteListAndDetailPane(
-    onButtonClick: () -> Unit,
-    viewModel: HomePaneViewModel = viewModel(),
-    modifier: Modifier = Modifier
-) {
-    val navigator = rememberListDetailPaneScaffoldNavigator<Nothing>()
-    val uiState by viewModel.uiState.collectAsState()
-
-    BackHandler(navigator.canNavigateBack()) {
-        navigator.navigateBack()
-    }
-
-    ListDetailPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
-        listPane = {
-            NoteList(
-                onItemClick = {
-                    viewModel.updateNote(it)
-                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)
-                },
-                onButtonClick = onButtonClick,
-                viewModel = viewModel
-            )
-        },
-        detailPane = {
-            uiState.note?.let { NoteDetail(it) }
-        }
-    )
 }
