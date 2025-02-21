@@ -2,16 +2,20 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
     alias(libs.plugins.ksp)
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.20"
+    id("kotlin-parcelize")
+    id("kotlin-kapt")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
     namespace = "com.example.cahier"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.cahier"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -73,6 +77,8 @@ dependencies {
 
     //Room
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.ink.authoring.android)
+    implementation(libs.androidx.input.motionprediction)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
 
@@ -84,4 +90,30 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Ink dependencies
+    implementation(libs.androidx.ink.authoring)
+    implementation(libs.androidx.ink.brush)
+    implementation(libs.androidx.ink.geometry)
+    implementation(libs.androidx.ink.nativeloader)
+    implementation(libs.androidx.ink.rendering)
+    implementation(libs.androidx.ink.strokes)
+    implementation(libs.androidx.ink.storage)
+
+    // Gson
+    implementation(libs.gson)
+
+    //Kotlin serialization
+    implementation(libs.kotlinx.serialization.json)
+
+    implementation(libs.appcompat.v7)
+
+    //Hilt
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.android.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+}
+
+kapt {
+    correctErrorTypes = true
 }

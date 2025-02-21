@@ -1,11 +1,14 @@
 package com.example.cahier.data
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.AutoMigrationSpec
 
-@Database(entities = [Note::class], version = 2)
+@Database(entities = [Note::class], version = 3,
+)
 abstract class NoteDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 
@@ -20,7 +23,7 @@ abstract class NoteDatabase : RoomDatabase() {
                     NoteDatabase::class.java,
                     "note_database"
                 )
-                    .createFromAsset("database/notes.db")
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also {
                         Instance = it

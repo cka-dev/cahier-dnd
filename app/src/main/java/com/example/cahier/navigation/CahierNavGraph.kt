@@ -6,39 +6,64 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.cahier.ui.DrawingCanvas
 import com.example.cahier.ui.HomeDestination
 import com.example.cahier.ui.HomePane
 import com.example.cahier.ui.NoteCanvas
-import com.example.cahier.ui.NoteCanvasDestination
 
 
 @Composable
 fun CahierNavHost(
     navController: NavHostController
 ) {
-    val startDestination: String = HomeDestination.route
-
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = HomeDestination.route
     ) {
         composable(HomeDestination.route) {
+
             HomePane(
-                navigateToCanvas = {
-                    navController.navigate("${NoteCanvasDestination.route}/${it}")
+                navigateToCanvas = { noteId ->
+                    navController.navigate("${TextCanvasDestination.route}/$noteId")
+                },
+                navigateToDrawingCanvas = { noteId ->
+                    navController.navigate("${DrawingCanvasDestination.route}/$noteId")
                 },
                 navigateUp = {
-                    navController.navigate(HomeDestination.route)
+                    navController.navigateUp()
                 }
             )
         }
         composable(
-            route = NoteCanvasDestination.routeWithArgs,
-            arguments = listOf(navArgument(NoteCanvasDestination.NOTE_ID_ARG) {
+            route = TextCanvasDestination.routeWithArgs,
+            arguments = listOf(navArgument(TextCanvasDestination.NOTE_ID_ARG) {
                 type = NavType.LongType
             })
-        ) {
-            NoteCanvas()
+        ) { navBackStackEntry ->
+            NoteCanvas(navBackStackEntry)
+        }
+        composable(
+            route = DrawingCanvasDestination.routeWithArgs,
+            arguments = listOf(navArgument(DrawingCanvasDestination.NOTE_ID_ARG) {
+                type = NavType.LongType
+            })
+        ) { navBackStackEntry ->
+            DrawingCanvas(
+                navBackStackEntry = navBackStackEntry,
+            )
         }
     }
+}
+
+object TextCanvasDestination : NavigationDestination {
+    override val route = "note_canvas"
+    const val NOTE_ID_ARG = "noteId"
+    val routeWithArgs = "$route/{$NOTE_ID_ARG}"
+}
+
+
+object DrawingCanvasDestination : NavigationDestination {
+    override val route = "drawing_canvas"
+    const val NOTE_ID_ARG = "noteId"
+    val routeWithArgs = "$route/{$NOTE_ID_ARG}"
 }

@@ -1,33 +1,31 @@
 package com.example.cahier.data
 
+import android.os.Parcelable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
 
+@Parcelize
+@Serializable
 @Entity(tableName = "notes")
 data class Note(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     @ColumnInfo(name = "title")
-    val title: String,
-//    @ColumnInfo(name = "last_modified")
-//    val lastModified: LocalDate = LocalDate.now(),
-//    val tags: List<String>?,
+    val title: String = "",
     @ColumnInfo(name = "text")
-    val text: String?,
+    val text: String? = null,
     @ColumnInfo(name = "image")
-    /*@DrawableRes */val image: Int?,
-//    val list: List<Any>? = null,
-//    val sketch: Painter? = null,
-//    @ColumnInfo(name = "calendar_date")
-//    val calendarDate: LocalDate? = null
-)
-//{
-//    companion object {
-//        val Saver: Saver<Note?, Int> = Saver(
-//            { it?.id },
-//            { Note(it, "", LocalDate.now(), null, null, null, null, null, null) }
-//        )
-//    }
-//}
+    val image: Int? = null,
+    @ColumnInfo(name = "type")
+    val type: NoteType = NoteType.TEXT,
+    @ColumnInfo(name = "strokes_data")
+    val strokesData: String? = null
+) : Parcelable
 
+enum class NoteType {
+    TEXT,
+    DRAWING
+}

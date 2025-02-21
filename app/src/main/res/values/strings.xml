@@ -10,4 +10,25 @@
     <string name="trash">Trash</string>
     <string name="title">Title</string>
     <string name="note">Note</string>
+    <string name="drawing_note">Drawing Note</string>
+    <string name="drawing_title">Drawing Title</string>"
+    <string name="text_note">Text Note</string>
+    <string name="drawing">Drawing</string>
+    <string name="add_note">Add Note</string>"
+    <string name="delete_note">Delete Note</string>
+
+    <!-- Ink Tools -->
+    <string name="brush">Brush</string>
+    <string name="color">Color</string>
+    <string name="eraser">Eraser</string>
+    <string name="clear">Clear</string>
+    <string name="save">Save</string>
+    <string name="select_color">Select Color</string>
+    <string name="dismiss">Dismiss</string>
+
+    <!-- Ink Brush Families -->
+    <string name="pressure_pen">Pen</string>
+    <string name="marker">Marker</string>
+    <string name="highlighter">Highlighter</string>
+    <string name="dashed_line">Dashed Line</string>
 </resources>

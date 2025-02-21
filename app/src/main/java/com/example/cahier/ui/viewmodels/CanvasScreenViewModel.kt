@@ -1,70 +1,63 @@
 package com.example.cahier.ui.viewmodels
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cahier.data.CahierUiState
 import com.example.cahier.data.Note
 import com.example.cahier.data.NotesRepository
-import com.example.cahier.ui.NoteCanvasDestination
+import com.example.cahier.navigation.TextCanvasDestination
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class CanvasScreenViewModel(
+@HiltViewModel
+class CanvasScreenViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val noteRepository: NotesRepository
 ) : ViewModel() {
+    private val _uiState = MutableStateFlow(CahierUiState())
+    val uiState: StateFlow<CahierUiState> = _uiState.asStateFlow()
 
-    private val _note = MutableStateFlow(CahierUiState())
-    val note: StateFlow<CahierUiState> = _note.asStateFlow()
-
-    private val noteId: Long? = savedStateHandle[NoteCanvasDestination.NOTE_ID_ARG]
+    private val noteId: Long? = savedStateHandle[TextCanvasDestination.NOTE_ID_ARG]
 
     init {
         viewModelScope.launch {
-            noteRepository.getNoteStream(noteId!!)
-                .filterNotNull()
-                .collect {
-                    _note.value = CahierUiState(it)
-                }
+            if (noteId != null) {
+                noteRepository.getNoteStream(noteId)
+                    .filterNotNull()
+                    .collect {
+                        _uiState.value = CahierUiState(note = it)
+                    }
+            }
         }
     }
 
     fun updateNoteTitle(title: String) {
-        try {
-            updateUiState(note.value.note.copy(title = title))
-            viewModelScope.launch {
-                noteRepository.updateNote(note.value.note.copy(title = title))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating note: ${e.message}")
-        }
+        updateNoteField(title) { note, value -> note.copy(title = value) }
     }
 
     fun updateNoteText(text: String) {
+        updateNoteField(text) { note, value -> note.copy(text = value) }
+    }
+
+    private fun <T> updateNoteField(value: T, updater: (Note, T) -> Note) {
         try {
-            updateUiState(note.value.note.copy(text = text))
+            _uiState.value = _uiState.value.copy(
+                note = updater(_uiState.value.note, value)
+            )
             viewModelScope.launch {
-                noteRepository.updateNote(note.value.note.copy(text = text))
+                if (noteId != null)
+                    noteRepository.updateNote(_uiState.value.note)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating note: ${e.message}")
+            _uiState.value = _uiState.value.copy(error = "Error updating note: ${e.message}")
         }
     }
-
-    private fun updateUiState(note: Note) {
-        try {
-            _note.update { it.copy(note = note) }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating note: ${e.message}")
-        }
-    }
-
 
     companion object {
         private const val TAG = "CanvasScreenViewModel"

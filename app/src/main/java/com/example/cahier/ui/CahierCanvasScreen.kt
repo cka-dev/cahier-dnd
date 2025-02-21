@@ -17,24 +17,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavBackStackEntry
 import com.example.cahier.R
-import com.example.cahier.navigation.NavigationDestination
-import com.example.cahier.ui.viewmodels.AppViewModelProvider
 import com.example.cahier.ui.viewmodels.CanvasScreenViewModel
-
-object NoteCanvasDestination : NavigationDestination {
-    override val route = "note_canvas"
-    const val NOTE_ID_ARG = "noteId"
-    val routeWithArgs = "$route/{$NOTE_ID_ARG}"
-}
 
 @Composable
 fun NoteCanvas(
+    navBackStackEntry: NavBackStackEntry,
     modifier: Modifier = Modifier,
-    canvasScreenViewModel: CanvasScreenViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    canvasScreenViewModel: CanvasScreenViewModel = hiltViewModel()
 ) {
-    val uiState = canvasScreenViewModel.note.collectAsState()
+    val uiState = canvasScreenViewModel.uiState.collectAsState()
     var isTextFieldVisible by remember { mutableStateOf(true) }
 
     Canvas(

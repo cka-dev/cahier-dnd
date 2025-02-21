@@ -1,5 +1,6 @@
 package com.example.cahier.data
 
+import androidx.ink.strokes.Stroke
 import kotlinx.coroutines.flow.Flow
 
 interface NotesRepository {
@@ -23,4 +24,15 @@ interface NotesRepository {
      * Update note in the data source
      */
     suspend fun updateNote(note: Note)
+
+    /**
+     * Update the strokes data of a note.
+     */
+    suspend fun updateNoteStrokes(noteId: Long, strokes: List<Stroke>)
+
+    /**
+     * Retrieve strokes data for a note.
+     */
+    suspend fun getNoteStrokes(noteId: Long): List<Stroke>
+
 }

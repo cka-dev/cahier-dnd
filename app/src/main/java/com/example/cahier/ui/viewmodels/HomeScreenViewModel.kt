@@ -3,24 +3,33 @@ package com.example.cahier.ui.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.cahier.data.CahierUiState
 import com.example.cahier.data.Note
+import com.example.cahier.data.NoteType
 import com.example.cahier.data.NotesRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class HomeScreenViewModel(private val noteRepository: NotesRepository) : ViewModel() {
+@HiltViewModel
+class HomeScreenViewModel @Inject constructor(
+    private val noteRepository: NotesRepository
+) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<Note?>(null)
-    val uiState: StateFlow<Note?> = _uiState
+    private val _uiState = MutableStateFlow(CahierUiState())
+    val uiState: StateFlow<CahierUiState> = _uiState.asStateFlow()
 
     private var newlyAddedId = 0L
 
     /**
-     * Holds ui state for the list of notes on the home pane. The list of items are retrieved from [NoteRepository] and mapped to
+     * Holds ui state for the list of notes on the home pane.
+     * The list of items are retrieved from [NoteRepository] and mapped to
      * [NoteListUiState]
      */
     val noteList: StateFlow<NoteListUiState> =
@@ -32,51 +41,68 @@ class HomeScreenViewModel(private val noteRepository: NotesRepository) : ViewMod
             )
 
     fun selectNote(noteId: Long) {
-        try {
-            viewModelScope.launch {
-                noteRepository.getNoteStream(noteId).collect {
-                    _uiState.value = it
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                noteRepository.getNoteStream(noteId).collect { note ->
+                    val strokes = if (note.type == NoteType.DRAWING) {
+                        noteRepository.getNoteStrokes(noteId)
+                    } else {
+                        emptyList()
+                    }
+                    _uiState.value = CahierUiState(note = note, strokes = strokes)
                 }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Error retrieving note: ${e.message}",
+                    isLoading = false
+                )
+                Log.e(TAG, "Error retrieving note: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error retrieving note: ${e.message}")
         }
-
     }
 
     fun addNote(callback: (id: Long) -> Unit): Long {
+        return addNoteOfType(NoteType.TEXT, callback)
+    }
+
+    fun addDrawingNote(callback: (id: Long) -> Unit): Long {
+        return addNoteOfType(NoteType.DRAWING, callback)
+    }
+
+    private fun addNoteOfType(noteType: NoteType, callback: (id: Long) -> Unit): Long {
         try {
             viewModelScope.launch {
-                resetUiState()
-                newlyAddedId = noteRepository.addNote(_uiState.value!!)
-                _uiState.value =
-                    _uiState.value!!.copy(id = newlyAddedId)
+                val newNote = Note(
+                    id = 0,
+                    title = "",
+                    type = noteType,
+                    text = if (noteType == NoteType.TEXT) "" else null,
+                )
+                newlyAddedId = noteRepository.addNote(newNote)
+                _uiState.value = CahierUiState(note = newNote.copy(id = newlyAddedId))
                 callback(newlyAddedId)
             }
             return newlyAddedId
         } catch (e: Exception) {
             Log.e(TAG, "Error adding note: ${e.message}")
+            _uiState.value =
+                _uiState.value.copy(error = "Error adding note: ${e.message}")
             return -1
         }
-
     }
 
     fun deleteNote() {
         try {
             viewModelScope.launch {
-                noteRepository.deleteNote(_uiState.value!!)
+                _uiState.value.note.let {
+                    noteRepository.deleteNote(it)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting note: ${e.message}")
-        }
-    }
-
-    private fun resetUiState() {
-        try {
-            val newNote = Note(id = 0, title = "", text = "", image = null)
-            _uiState.value = newNote
-        } catch (e: Exception) {
-            Log.e(TAG, "Error resetting UI state: ${e.message}")
+            _uiState.value =
+                _uiState.value.copy(error = "Error deleting note: ${e.message}")
         }
     }
 

@@ -6,8 +6,10 @@ buildscript {
 }
 
 plugins {
-    alias(libs.plugins.androidApplication) version "8.4.2" apply false
-    alias(libs.plugins.androidLibrary) version "8.4.2" apply false
-    alias(libs.plugins.jetbrainsKotlinAndroid) version "1.9.0" apply false
-    alias(libs.plugins.ksp) version "1.9.21-1.0.15" apply false
+    alias(libs.plugins.androidApplication) version "8.8.0" apply false
+    alias(libs.plugins.androidLibrary) version "8.8.0" apply false
+    alias(libs.plugins.jetbrainsKotlinAndroid) version "2.1.10" apply false
+    alias(libs.plugins.ksp) version "2.1.10-1.0.29" apply false
+    kotlin("plugin.serialization") version "2.1.10"
+    id("com.google.dagger.hilt.android") version "2.51.1" apply false
 }
