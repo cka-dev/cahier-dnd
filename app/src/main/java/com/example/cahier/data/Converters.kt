@@ -1,15 +1,19 @@
 package com.example.cahier.data
 
+import android.util.Log
 import androidx.ink.brush.Brush
 import androidx.ink.brush.StockBrushes
 import androidx.ink.storage.decodeOrThrow
 import androidx.ink.storage.encode
 import androidx.ink.strokes.Stroke
 import androidx.ink.strokes.StrokeInputBatch
+import androidx.room.TypeConverter
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.lang.reflect.Type
 
 class Converters {
 
@@ -72,5 +76,24 @@ class Converters {
     fun deserializeStrokeFromString(data: String): Stroke? {
         val serializedStroke = gson.fromJson(data, SerializedStroke::class.java)
         return deserializeStroke(serializedStroke)
+    }
+
+    @TypeConverter
+    fun fromStringList(list: List<String>?): String? {
+        return list?.let { gson.toJson(it) }
+    }
+
+    @TypeConverter
+    fun toStringList(jsonString: String?): List<String>? {
+        if (jsonString == null) {
+            return emptyList()
+        }
+        val listType: Type = object : TypeToken<List<String>>() {}.type
+        return try {
+            gson.fromJson(jsonString, listType) ?: emptyList()
+        } catch (e: Exception) {
+            Log.e("Converters", "Error decoding string list from JSON: $jsonString", e)
+            emptyList()
+        }
     }
 }

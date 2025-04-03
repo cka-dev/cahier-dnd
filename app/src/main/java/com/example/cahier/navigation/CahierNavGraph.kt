@@ -31,7 +31,7 @@ fun CahierNavHost(
                 },
                 navigateUp = {
                     navController.navigateUp()
-                }
+                },
             )
         }
         composable(
@@ -40,7 +40,10 @@ fun CahierNavHost(
                 type = NavType.LongType
             })
         ) { navBackStackEntry ->
-            NoteCanvas(navBackStackEntry)
+            NoteCanvas(
+                navBackStackEntry = navBackStackEntry,
+                onExit = { navController.navigateUp() },
+            )
         }
         composable(
             route = DrawingCanvasDestination.routeWithArgs,
@@ -50,6 +53,7 @@ fun CahierNavHost(
         ) { navBackStackEntry ->
             DrawingCanvas(
                 navBackStackEntry = navBackStackEntry,
+                navigateUp = { navController.navigateUp() },
             )
         }
     }

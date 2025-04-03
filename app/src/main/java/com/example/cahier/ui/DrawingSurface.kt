@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -19,6 +20,7 @@ import androidx.ink.authoring.InProgressStrokesView
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import androidx.ink.strokes.Stroke
 import androidx.input.motionprediction.MotionEventPredictor
+import com.example.cahier.data.CahierUiState
 
 @SuppressLint("ClickableViewAccessibility")
 @Composable
@@ -32,6 +34,7 @@ fun DrawingSurface(
         pointerIdToStrokeId: MutableMap<Int, InProgressStrokeId>,
         predictor: MotionEventPredictor,
     ) -> Unit,
+    uiState: CahierUiState,
     modifier: Modifier = Modifier
 ) {
     val pointerIdToStrokeId = remember { mutableMapOf<Int, InProgressStrokeId>() }
@@ -65,20 +68,44 @@ fun DrawingSurface(
             },
         )
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
+        Row(
+            modifier = Modifier.fillMaxSize()
         ) {
-            val canvas = drawContext.canvas.nativeCanvas
-            strokes.forEach { stroke ->
-                canvas.withSave {
-                    canvasStrokeRenderer.draw(
-                        stroke = stroke,
-                        canvas = this,
-                        strokeToScreenTransform = Matrix()
+            Box(
+                modifier = Modifier
+                    .weight(3f)
+                    .fillMaxSize()
+
+            ) {
+                Canvas(
+                    modifier = Modifier
+                ) {
+                    val canvas = drawContext.canvas.nativeCanvas
+                    strokes.forEach { stroke ->
+                        canvas.withSave {
+                            canvasStrokeRenderer.draw(
+                                stroke = stroke,
+                                canvas = this,
+                                strokeToScreenTransform = Matrix()
+                            )
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+            ) {
+                if (uiState.note.imageUriList?.isNotEmpty() == true) {
+                    NoteImagesView(
+                        images = uiState.note.imageUriList,
+                        onClearImages = { /*TODO*/ },
                     )
                 }
             }
+
         }
     }
 }

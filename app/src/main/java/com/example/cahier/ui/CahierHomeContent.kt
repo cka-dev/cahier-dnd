@@ -5,7 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,19 +15,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
@@ -36,38 +39,41 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.ink.strokes.Stroke
+import coil3.compose.AsyncImage
 import com.example.cahier.R
 import com.example.cahier.data.Note
 import com.example.cahier.data.NoteType
 
 @Composable
 fun NoteList(
+    favorites: List<Note>,
+    otherNotes: List<Note>,
     noteList: List<Note>,
     onAddNewTextNote: () -> Unit,
     onAddNewDrawingNote: () -> Unit,
     onNoteClick: (Note) -> Unit,
+    onToggleFavorite: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onDeleteNote: (Note) -> Unit = {},
 ) {
-
-    Card(
-        modifier = modifier,
+    Surface(
+        modifier = modifier.padding(16.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Scaffold(
             topBar = {
             }, floatingActionButton = {
-                val expanded = remember { mutableStateOf(false) }
+                val expanded = rememberSaveable { mutableStateOf(false) }
                 AddFloatingButton(
                     expanded = expanded,
                     onTextNoteSelected = {
@@ -81,19 +87,154 @@ fun NoteList(
                 )
             }, modifier = modifier
         ) { innerPadding ->
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(184.dp), Modifier.padding(innerPadding)
+            LazyColumn(
+                modifier = Modifier
+                    .padding(innerPadding),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                items(
-                    count = noteList.size,
-                    key = { index -> noteList[index].id }
-                ) { index ->
-                    NoteItem(
-                        note = noteList[index],
-                        onNoteClick = onNoteClick,
-                        onNoteDelete = onDeleteNote
-                    )
+                if (favorites.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = stringResource(R.string.favorites),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    items(favorites, key = { it.id }) { note ->
+                        NoteItem(
+                            note = note,
+                            onClick = { onNoteClick(note) },
+                            onDelete = { onDeleteNote(note) },
+                            onToggleFavorite = { onToggleFavorite(note.id) }
+                        )
+                    }
+
                 }
+
+                if (otherNotes.isNotEmpty()) {
+                    item {
+                        AnimatedVisibility(favorites.isNotEmpty()) {
+                            Text(
+                                text = stringResource(R.string.other_notes),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+
+                    items(otherNotes, key = { it.id }) { note ->
+                        NoteItem(
+                            note = note,
+                            onClick = { onNoteClick(note) },
+                            onDelete = { onDeleteNote(note) },
+                            onToggleFavorite = { onToggleFavorite(note.id) }
+                        )
+                    }
+                }
+
+                if (favorites.isEmpty() && otherNotes.isEmpty()) {
+                    items(noteList, key = { it.id }) { note ->
+                        NoteItem(
+                            note = note,
+                            onClick = { onNoteClick(note) },
+                            onDelete = { onDeleteNote(note) },
+                            onToggleFavorite = { onToggleFavorite(note.id) }
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun NoteItem(
+    note: Note,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+
+    OutlinedCard(
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Text(
+            text = note.title.ifBlank { stringResource(R.string.untitled_note) },
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(4.dp)
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+
+            Spacer(Modifier.height(4.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                note.imageUriList?.let { uriString ->
+                    AsyncImage(
+                        model = uriString,
+                        contentDescription = stringResource(R.string.note_image_preview),
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        contentScale = ContentScale.Crop,
+                        placeholder = painterResource(id = R.drawable.media)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+
+                if (note.type == NoteType.TEXT) {
+                    note.text?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Icon(
+                        painterResource(id = R.drawable.ic_drawing_mode),
+                        contentDescription = stringResource(R.string.drawing_note_indicator),
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.drawing),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                }
+            }
+        }
+
+        Row {
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    imageVector = if (note.isFavorite)
+                        Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = if (note.isFavorite)
+                        stringResource(R.string.unfavorite) else stringResource(R.string.favorite),
+                    tint = if (note.isFavorite)
+                        MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.delete_note)
+                )
             }
         }
     }
@@ -141,69 +282,19 @@ fun NoteDetail(
                     )
                 }
             }
-            note.image?.let { imageRes ->
+            note.imageUriList.let { uriString ->
                 Spacer(modifier = Modifier.height(16.dp))
-                Image(
-                    painter = painterResource(imageRes),
+                AsyncImage(
+                    model = uriString,
                     contentDescription = note.title,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.Crop
                 )
             }
         }
     }
 }
 
-@Composable
-fun NoteItem(
-    onNoteClick: (Note) -> Unit,
-    onNoteDelete: (Note) -> Unit,
-    note: Note,
-    modifier: Modifier = Modifier
-) {
-    Surface {
-        Column {
-            OutlinedCard(
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNoteClick(note) }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = note.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Image(
-                        painterResource(R.drawable.media),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(184.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.delete_note),
-                            modifier = Modifier.clickable {
-                                onNoteDelete(note)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun AddFloatingButton(
@@ -307,15 +398,4 @@ fun AddFloatingButton(
             )
         }
     }
-}
-
-@Preview
-@Composable
-fun AddFloatingButtonPreview() {
-    val expanded = remember { mutableStateOf(true) }
-    AddFloatingButton(
-        expanded = expanded,
-        onTextNoteSelected = {},
-        onDrawingNoteSelected = {}
-    )
 }

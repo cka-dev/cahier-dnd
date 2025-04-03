@@ -1,25 +1,47 @@
 package com.example.cahier.ui
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.UiThread
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -27,12 +49,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -52,6 +77,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun DrawingCanvas(
     navBackStackEntry: NavBackStackEntry,
+    navigateUp: () -> Unit,
     modifier: Modifier = Modifier,
     drawingCanvasViewModel: DrawingCanvasViewModel = hiltViewModel()
 ) {
@@ -65,6 +91,20 @@ fun DrawingCanvas(
     val canvasStrokeRenderer = remember { CanvasStrokeRenderer.create() }
     val coroutineScope = rememberCoroutineScope()
 
+    val canUndo by drawingCanvasViewModel.canUndo.collectAsState()
+    val canRedo by drawingCanvasViewModel.canRedo.collectAsState()
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            val flag = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(uri, flag)
+            coroutineScope.launch {
+                drawingCanvasViewModel.updateImageUri(it.toString())
+            }
+        }
+    }
 
     val listener = remember(inProgressStrokesView) {
 
@@ -77,7 +117,6 @@ fun DrawingCanvas(
     }
 
     drawingCanvasViewModel.setInProgressStrokesFinishedListener(inProgressStrokesView, listener)
-
 
     DisposableEffect(Unit) {
         onDispose {
@@ -95,126 +134,246 @@ fun DrawingCanvas(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        TextField(
-            value = uiState.note.title,
-            onValueChange = { newTitle ->
-                coroutineScope.launch {
-                    drawingCanvasViewModel.updateNoteTitle(newTitle)
-                }
-            },
-            placeholder = { Text(text = stringResource(R.string.drawing_title)) },
-            modifier = Modifier.fillMaxWidth()
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextField(
+                value = uiState.note.title,
+                onValueChange = { newTitle ->
+                    coroutineScope.launch {
+                        drawingCanvasViewModel.updateNoteTitle(newTitle)
+                    }
+                },
+                placeholder = { Text(text = stringResource(R.string.drawing_title)) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { /* Maybe hide keyboard */ })
+            )
+        }
         DrawingToolbox(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .padding(8.dp),
-            drawingCanvasViewModel = drawingCanvasViewModel
+            drawingCanvasViewModel = drawingCanvasViewModel,
+            imagePickerLauncher = imagePickerLauncher,
+            canUndo = canUndo,
+            canRedo = canRedo,
+            onUndo = drawingCanvasViewModel::undo,
+            onRedo = drawingCanvasViewModel::redo,
+            onExit = navigateUp,
         )
         DrawingSurface(
             strokes = uiState.strokes,
             inProgressStrokesView = inProgressStrokesView,
             canvasStrokeRenderer = canvasStrokeRenderer,
             onDrawing = drawingCanvasViewModel::handleDrawing,
+            uiState = uiState,
             modifier = Modifier.weight(1f),
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DrawingToolbox(
-    modifier: Modifier = Modifier,
-    drawingCanvasViewModel: DrawingCanvasViewModel
+    drawingCanvasViewModel: DrawingCanvasViewModel,
+    imagePickerLauncher: ActivityResultLauncher<PickVisualMediaRequest>,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var brushMenuExpanded by remember { mutableStateOf(false) }
-    var showColorPicker by remember { mutableStateOf(false) }
+    var brushMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var showColorPicker by rememberSaveable { mutableStateOf(false) }
+    val isEraserMode by drawingCanvasViewModel.isEraserMode.collectAsState()
+    val uiState by drawingCanvasViewModel.uiState.collectAsState()
+    var optionsMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
-    Row(
-        modifier = modifier.background(
-            MaterialTheme.colorScheme.surfaceVariant,
-            shape = MaterialTheme.shapes.medium
-        )
+    Surface(
+        modifier = modifier,
+        tonalElevation = 4.dp,
+        shape = MaterialTheme.shapes.medium
     ) {
-        IconButton(onClick = {
-            brushMenuExpanded = true
-            drawingCanvasViewModel.setEraserMode(false)
-        }) {
-            Icon(
-                painter = painterResource(R.drawable.brush_24px),
-                contentDescription = stringResource(R.string.brush),
-            )
-        }
+        Row(
+            modifier = modifier
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.medium
+                )
+                .height(IntrinsicSize.Min)
 
-        BrushDropdownMenu(
-            expanded = brushMenuExpanded,
-            onDismissRequest = { brushMenuExpanded = false },
-            onBrushChange = { newBrush ->
-                coroutineScope.launch {
-                    drawingCanvasViewModel.changeBrush(newBrush)
-                }
-                brushMenuExpanded = false
-            }
-        )
-
-        IconButton(onClick = {
-            showColorPicker = true
-            drawingCanvasViewModel.setEraserMode(false)
-        }) {
-            Icon(
-                painter = painterResource(R.drawable.palette_24px),
-                contentDescription = stringResource(R.string.color),
-            )
-        }
-
-        ColorPickerDialog(
-            showDialog = showColorPicker,
-            onDismissRequest = { showColorPicker = false },
-            onColorSelected = { color ->
-                coroutineScope.launch {
-                    drawingCanvasViewModel.changeBrushColor(color)
-                }
-                showColorPicker = false
-            }
-        )
-
-        IconButton(onClick = { drawingCanvasViewModel.setEraserMode(true) }) {
-            Icon(
-                painter = painterResource(R.drawable.ink_eraser_24px),
-                contentDescription = stringResource(R.string.eraser)
-            )
-        }
-
-        Button(
-            onClick = {
-                coroutineScope.launch {
-                    drawingCanvasViewModel.clearStrokes()
-                }
-            }
         ) {
-            Text(text = stringResource(R.string.clear))
-        }
-
-        Spacer(modifier = Modifier.size(4.dp))
-
-        Button(
-            onClick = {
-                coroutineScope.launch {
-                    drawingCanvasViewModel.saveStrokes()
-                }
+            IconButton(onClick = {
+                brushMenuExpanded = true
+                drawingCanvasViewModel.setEraserMode(false)
             }) {
-            Text(text = stringResource(R.string.save))
+                Icon(
+                    painter = painterResource(R.drawable.brush_24px),
+                    contentDescription = stringResource(R.string.brush),
+                    modifier = Modifier.background(
+                        color = if (isEraserMode) Color.Transparent else
+                            MaterialTheme.colorScheme.inversePrimary,
+                        shape = CircleShape
+                    )
+                )
+            }
+
+            BrushDropdownMenu(
+                expanded = brushMenuExpanded,
+                onDismissRequest = { brushMenuExpanded = false },
+                onBrushChange = { newBrush, newSize ->
+                    coroutineScope.launch {
+                        drawingCanvasViewModel.changeBrush(newBrush, newSize)
+                    }
+                    brushMenuExpanded = false
+                },
+            )
+
+            IconButton(onClick = {
+                showColorPicker = true
+                drawingCanvasViewModel.setEraserMode(false)
+            }) {
+                Icon(
+                    painter = painterResource(R.drawable.palette_24px),
+                    contentDescription = stringResource(R.string.color),
+                )
+            }
+
+            ColorPickerDialog(
+                showDialog = showColorPicker,
+                onDismissRequest = { showColorPicker = false },
+                onColorSelected = { color ->
+                    coroutineScope.launch {
+                        drawingCanvasViewModel.changeBrushColor(color)
+                    }
+                    showColorPicker = false
+                }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            VerticalDivider(
+                thickness = 4.dp,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(vertical = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(onClick = onUndo, enabled = canUndo) {
+                Icon(
+                    painter = painterResource(R.drawable.undo_24px),
+                    contentDescription = stringResource(R.string.undo)
+                )
+            }
+
+            IconButton(onClick = onRedo, enabled = canRedo) {
+                Icon(
+                    painter = painterResource(R.drawable.redo_24px),
+                    contentDescription = stringResource(R.string.redo)
+                )
+            }
+
+            IconButton(onClick = { drawingCanvasViewModel.setEraserMode(true) }) {
+                Icon(
+                    painter = painterResource(R.drawable.ink_eraser_24px),
+                    contentDescription = stringResource(R.string.eraser),
+                    modifier = Modifier.background(
+                        color = if (isEraserMode)
+                            MaterialTheme.colorScheme.inversePrimary else Color.Transparent,
+                    )
+                )
+            }
+
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        drawingCanvasViewModel.clearStrokes()
+                    }
+                }
+            ) {
+                Text(text = stringResource(R.string.clear))
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            VerticalDivider(
+                thickness = 4.dp,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(vertical = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(onClick = { drawingCanvasViewModel.toggleFavorite() }) {
+                Icon(
+                    imageVector = if (uiState.note.isFavorite)
+                        Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = if (uiState.note.isFavorite)
+                        stringResource(R.string.unfavorite) else stringResource(R.string.favorite),
+                    tint = if (uiState.note.isFavorite)
+                        MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
+            }
+
+            Spacer(modifier = Modifier.size(4.dp))
+
+            IconButton(onClick = {
+                imagePickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }) {
+                Icon(
+                    painter = painterResource(R.drawable.image_24px),
+                    contentDescription = stringResource(R.string.add_image)
+                )
+            }
+
+            Box {
+                IconButton(onClick = { optionsMenuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = stringResource(R.string.more_options)
+                    )
+                }
+                DropdownMenu(
+                    expanded = optionsMenuExpanded,
+                    onDismissRequest = { optionsMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.exit)) },
+                        onClick = {
+                            optionsMenuExpanded = false
+                            onExit()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                }
+            }
         }
     }
-}
 
+}
 
 @Composable
 fun BrushDropdownMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
-    onBrushChange: (BrushFamily) -> Unit
+    onBrushChange: (BrushFamily, Float) -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val pressurePenSize = 5f
+    val markerSize = 10f
+    val highlighterSize = 25f
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
@@ -222,19 +381,19 @@ fun BrushDropdownMenu(
     ) {
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.pressure_pen)) },
-            onClick = { onBrushChange(StockBrushes.pressurePenLatest) }
+            onClick = { onBrushChange(StockBrushes.pressurePenLatest, pressurePenSize) }
         )
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.marker)) },
-            onClick = { onBrushChange(StockBrushes.markerLatest) }
+            onClick = { onBrushChange(StockBrushes.markerLatest, markerSize) }
         )
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.highlighter)) },
-            onClick = { onBrushChange(StockBrushes.highlighterLatest) }
+            onClick = { onBrushChange(StockBrushes.highlighterLatest, highlighterSize) }
         )
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.dashed_line)) },
-            onClick = { onBrushChange(StockBrushes.dashedLineLatest) }
+            onClick = { onBrushChange(StockBrushes.dashedLineLatest, pressurePenSize) }
         )
     }
 }

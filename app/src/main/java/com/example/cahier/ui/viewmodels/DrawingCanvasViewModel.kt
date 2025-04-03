@@ -1,7 +1,9 @@
 package com.example.cahier.ui.viewmodels
 
+import android.util.Log
 import android.view.MotionEvent
 import androidx.annotation.UiThread
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.ink.authoring.InProgressStrokeId
@@ -43,9 +45,12 @@ class DrawingCanvasViewModel @Inject constructor(
 
     private val noteId: Long = checkNotNull(savedStateHandle[DrawingCanvasDestination.NOTE_ID_ARG])
 
+    val currentNightMode = AppCompatDelegate.getDefaultNightMode()
+
     val defaultBrush = Brush.createWithColorIntArgb(
         family = StockBrushes.pressurePenLatest,
-        colorIntArgb = Color.Black.toArgb(),
+        colorIntArgb = if (currentNightMode == AppCompatDelegate.MODE_NIGHT_YES)
+            Color.White.toArgb() else Color.Gray.toArgb(),
         size = 5F,
         epsilon = 0.1F
     )
@@ -59,35 +64,112 @@ class DrawingCanvasViewModel @Inject constructor(
     private var previousPoint: MutableVec? = null
     private val eraserPadding = 50f
 
+    private val history = mutableListOf<List<Stroke>>()
+    private var historyIndex = -1
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+
     init {
         viewModelScope.launch {
             noteRepository.getNoteStream(noteId)
                 .filterNotNull()
                 .collect { note ->
-                    if (note.strokesData != null) {
-                        loadStrokes(note.id)
-                        _uiState.update {
-                            it.copy(note = note)
+                    val initialStrokes = if (note.strokesData != null) {
+                        noteRepository.getNoteStrokes(note.id)
+                    } else {
+                        emptyList()
+                    }
+                    _uiState.update {
+                        it.copy(note = note, strokes = initialStrokes)
+                    }
+                    if (history.isEmpty()) {
+                        history.clear()
+                        history.add(initialStrokes)
+                        historyIndex = 0
+                        updateUndoRedoState()
+                    } else {
+                        if (historyIndex >= 0 && historyIndex < history.size) {
+                            _uiState.update { it.copy(strokes = history[historyIndex]) }
                         }
+                        updateUndoRedoState()
                     }
                 }
         }
     }
 
-    private suspend fun loadStrokes(noteId: Long) {
-        val savedStrokes = noteRepository.getNoteStrokes(noteId)
-        _uiState.value = _uiState.value.copy(strokes = savedStrokes)
+    private fun updateStrokes(newStrokes: List<Stroke>) {
+        if (historyIndex < history.size - 1) {
+            history.subList(historyIndex + 1, history.size).clear()
+        }
+        history.add(newStrokes)
+        historyIndex++
+
+        _uiState.update { it.copy(strokes = newStrokes) }
+        updateUndoRedoState()
+        viewModelScope.launch { saveStrokes() }
     }
 
-    suspend fun addStrokeToUiState(stroke: Stroke) {
-        _uiState.update {
-            it.copy(strokes = it.strokes + stroke)
+    private fun updateUndoRedoState() {
+        _canUndo.value = historyIndex > 0
+        _canRedo.value = historyIndex < history.size - 1
+    }
+
+    fun undo() {
+        if (canUndo.value) {
+            historyIndex--
+            _uiState.update { it.copy(strokes = history[historyIndex]) }
+            updateUndoRedoState()
+            viewModelScope.launch { saveStrokes() }
+        }
+    }
+
+    fun redo() {
+        if (canRedo.value) {
+            historyIndex++
+            _uiState.update { it.copy(strokes = history[historyIndex]) }
+            updateUndoRedoState()
+            viewModelScope.launch { saveStrokes() }
+        }
+    }
+
+    fun toggleFavorite() {
+        viewModelScope.launch {
+            noteRepository.toggleFavorite(noteId)
+        }
+    }
+
+    suspend fun updateImageUri(uri: String?) {
+        if (uri == null) return
+
+        var updatedList: List<String>? = null
+
+        _uiState.update { currentState ->
+            val currentList = currentState.note.imageUriList ?: emptyList()
+            val newList = currentList + uri
+            updatedList = newList
+            val updatedNote = currentState.note.copy(imageUriList = newList)
+            currentState.copy(note = updatedNote)
+        }
+
+        updatedList?.let { listToSave ->
+            try {
+                noteRepository.updateNoteImageUriList(noteId = noteId, imageUriList = listToSave)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save updated image list for note $noteId", e)
+            }
         }
     }
 
     suspend fun saveStrokes() {
-        noteRepository.updateNoteStrokes(noteId, _uiState.value.strokes)
+        if (historyIndex >= 0 && historyIndex < history.size) {
+            noteRepository.updateNoteStrokes(noteId, history[historyIndex])
+        } else if (history.isEmpty()) {
+            noteRepository.updateNoteStrokes(noteId, emptyList())
+        }
     }
+
 
     suspend fun updateNoteTitle(newTitle: String) {
         val updatedNote = _uiState.value.note.copy(title = newTitle)
@@ -120,11 +202,15 @@ class DrawingCanvasViewModel @Inject constructor(
             if (event.actionMasked == MotionEvent.ACTION_MOVE
                 || event.actionMasked == MotionEvent.ACTION_DOWN
             ) {
-                eraseIntersectingStrokes(
-                    event.x,
-                    event.y,
-                    inProgressStrokesView
+
+                val strokesBeforeErase = history.getOrElse(historyIndex) { emptyList() }
+                val strokesAfterErase = eraseIntersectingStrokes(
+                    event.x, event.y, strokesBeforeErase
                 )
+
+                if (strokesAfterErase.size != strokesBeforeErase.size) {
+                    updateStrokes(strokesAfterErase)
+                }
             }
         } else {
             predictor.record(event)
@@ -174,6 +260,7 @@ class DrawingCanvasViewModel @Inject constructor(
             } finally {
                 predictedEvent?.recycle()
             }
+            if (previousPoint != null) previousPoint = null
         }
     }
 
@@ -185,52 +272,42 @@ class DrawingCanvasViewModel @Inject constructor(
         inProgressStrokesView.postOnAnimation {
             inProgressStrokesView.removeFinishedStrokes(strokes.keys)
         }
-        strokes.values.forEach { stroke ->
-            viewModelScope.launch {
-                addStrokeToUiState(stroke)
-                saveStrokes()
-            }
-        }
+        val currentStrokes = history.getOrElse(historyIndex) { emptyList() }
+        val newStrokes = currentStrokes + strokes.values.toList()
+        updateStrokes(newStrokes)
+        viewModelScope.launch { saveStrokes() }
     }
 
     private fun eraseIntersectingStrokes(
         currentX: Float,
         currentY: Float,
-        inProgressStrokesView: InProgressStrokesView
-    ) {
+        currentStrokes: List<Stroke>,
+    ): List<Stroke> {
         val prev = previousPoint
-        if (prev == null) {
-            previousPoint = MutableVec(currentX, currentY)
-            return
-        }
+        previousPoint = MutableVec(currentX, currentY)
+
+        if (prev == null) return currentStrokes
 
         val segment = MutableSegment(prev, MutableVec(currentX, currentY))
         val parallelogram = MutableParallelogram.fromSegmentAndPadding(segment, eraserPadding)
 
-        previousPoint = MutableVec(currentX, currentY)
-
-        val strokesToRemove = _uiState.value.strokes.filter { stroke ->
-            stroke.shape.let { shape ->
-                parallelogram.intersects(shape, AffineTransform.IDENTITY)
-            }
+        val strokesToRemove = currentStrokes.filter { stroke ->
+            stroke.shape.intersects(parallelogram, AffineTransform.IDENTITY)
         }
 
-        if (strokesToRemove.isNotEmpty()) {
-            _uiState.update { currentState ->
-                val updatedStrokes = currentState.strokes - strokesToRemove.toSet()
-                currentState.copy(strokes = updatedStrokes)
-            }
-            inProgressStrokesView.invalidate()
-        }
-        viewModelScope.launch {
-            saveStrokes()
+        return if (strokesToRemove.isNotEmpty()) {
+            currentStrokes - strokesToRemove.toSet()
+        } else {
+            currentStrokes
         }
     }
 
-    fun changeBrush(brushFamily: BrushFamily) {
+
+    fun changeBrush(brushFamily: BrushFamily, size: Float) {
         _selectedBrush.update { currentBrush ->
             currentBrush.copy(
-                family = brushFamily
+                family = brushFamily,
+                size = size
             )
         }
     }
@@ -253,8 +330,9 @@ class DrawingCanvasViewModel @Inject constructor(
     }
 
     suspend fun clearStrokes() {
-        _uiState.update { it.copy(strokes = emptyList()) }
-        saveStrokes()
+        if (_uiState.value.strokes.isNotEmpty()) {
+            updateStrokes(emptyList())
+        }
     }
 
     override fun onCleared() {

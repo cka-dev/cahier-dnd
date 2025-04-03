@@ -36,7 +36,25 @@ class OfflineNotesRepository(private val notesDao: NoteDao) : NotesRepository {
         val note = notesDao.getNoteById(noteId)
         val strokesJson = note?.strokesData ?: return emptyList()
 
-        val strokesData: List<String> = Gson().fromJson(strokesJson, object : TypeToken<List<String>>() {}.type)
+        val strokesData: List<String> =
+            Gson().fromJson(strokesJson, object : TypeToken<List<String>>() {}.type)
         return strokesData.mapNotNull { converters.deserializeStrokeFromString(it) }
     }
+
+    override suspend fun toggleFavorite(noteId: Long) {
+        val note = notesDao.getNoteById(noteId)
+        if (note != null) {
+            val updatedNote = note.copy(isFavorite = !note.isFavorite)
+            notesDao.updateNote(updatedNote)
+        }
+    }
+
+    override suspend fun updateNoteImageUriList(noteId: Long, imageUriList: List<String>?) {
+        val note = notesDao.getNoteById(noteId)
+        if (note != null) {
+            val updatedNote = note.copy(imageUriList = imageUriList)
+            notesDao.updateNote(updatedNote)
+        }
+    }
+
 }

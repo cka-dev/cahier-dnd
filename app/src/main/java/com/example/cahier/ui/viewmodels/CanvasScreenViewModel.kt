@@ -1,5 +1,7 @@
 package com.example.cahier.ui.viewmodels
 
+import android.util.Log
+import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,14 +28,25 @@ class CanvasScreenViewModel @Inject constructor(
 
     private val noteId: Long? = savedStateHandle[TextCanvasDestination.NOTE_ID_ARG]
 
+    val titleFocusRequester = FocusRequester()
+    val bodyFocusRequester = FocusRequester()
+
     init {
         viewModelScope.launch {
-            if (noteId != null) {
+            if (noteId != null && noteId != 0L) {
                 noteRepository.getNoteStream(noteId)
                     .filterNotNull()
-                    .collect {
-                        _uiState.value = CahierUiState(note = it)
+                    .collect { loadedNote ->
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                note = loadedNote,
+                                isLoading = false,
+                                error = null
+                            )
+                        }
                     }
+            } else {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -58,6 +72,35 @@ class CanvasScreenViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(error = "Error updating note: ${e.message}")
         }
     }
+
+    suspend fun updateImageUri(uri: String?) {
+        if (uri == null) return
+
+        var updatedList: List<String>? = null
+
+        _uiState.update { currentState ->
+            val currentList = currentState.note.imageUriList ?: emptyList()
+            val newList = currentList + uri
+            updatedList = newList
+            val updatedNote = currentState.note.copy(imageUriList = newList)
+            currentState.copy(note = updatedNote)
+        }
+
+        updatedList?.let { listToSave ->
+            try {
+                noteId?.let { noteRepository.updateNoteImageUriList(it, listToSave) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save updated image list for note $noteId", e)
+            }
+        }
+    }
+
+    fun toggleFavorite() {
+        viewModelScope.launch {
+            noteId?.let { noteRepository.toggleFavorite(it) }
+        }
+    }
+
 
     companion object {
         private const val TAG = "CanvasScreenViewModel"

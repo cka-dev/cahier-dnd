@@ -12,8 +12,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -44,14 +47,16 @@ class HomeScreenViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                noteRepository.getNoteStream(noteId).collect { note ->
-                    val strokes = if (note.type == NoteType.DRAWING) {
-                        noteRepository.getNoteStrokes(noteId)
-                    } else {
-                        emptyList()
+                noteRepository.getNoteStream(noteId)
+                    .filterNotNull()
+                    .collect { note ->
+                        val strokes = if (note.type == NoteType.DRAWING) {
+                            noteRepository.getNoteStrokes(noteId)
+                        } else {
+                            emptyList()
+                        }
+                        _uiState.value = CahierUiState(note = note, strokes = strokes)
                     }
-                    _uiState.value = CahierUiState(note = note, strokes = strokes)
-                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     error = "Error retrieving note: ${e.message}",
@@ -103,6 +108,20 @@ class HomeScreenViewModel @Inject constructor(
             Log.e(TAG, "Error deleting note: ${e.message}")
             _uiState.value =
                 _uiState.value.copy(error = "Error deleting note: ${e.message}")
+        }
+    }
+
+    fun toggleFavorite(noteId: Long) {
+        viewModelScope.launch {
+            try {
+                noteRepository.toggleFavorite(noteId)
+                if (_uiState.value.note.id == noteId) {
+                    val updatedNote = noteRepository.getNoteStream(noteId).first()
+                    _uiState.update { it.copy(note = updatedNote) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error toggling favorite: ${e.message}")
+            }
         }
     }
 
