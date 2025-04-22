@@ -50,4 +50,13 @@
     <string name="uploaded_images">Uploaded Images</string>
     <string name="upload_image">Upload Image</string>
 
+    <!-- Settings Pane -->
+    <string name="notes_role_setting_title">Default Notes App</string>
+    <string name="notes_role_setting_description">Set this app as the default for handling note-taking actions and capturing content.</string>
+    <string name="notes_role_not_available">Notes Role not available on this device/OS version.</string>
+    <string name="notes_role_held">This app is the default Notes app.</string>
+    <string name="notes_role_not_held">This app is not the default Notes app.</string>
+    <string name="set_as_default_notes_app">Set as Default</string>
+    <string name="navigate_up">Back</string>
+
 </resources>

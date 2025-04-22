@@ -125,6 +125,10 @@ class HomeScreenViewModel @Inject constructor(
         }
     }
 
+    fun clearSelection() {
+        _uiState.update { CahierUiState() }
+    }
+
     companion object {
         private const val TIMEOUT_MILLIS = 5_000L
         private const val TAG = "HomeScreenViewModel"

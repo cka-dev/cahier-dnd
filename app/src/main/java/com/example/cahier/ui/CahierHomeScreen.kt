@@ -79,7 +79,9 @@ fun HomePane(
             if (noteList.noteList.isNotEmpty()) {
                 coroutineScope.launch {
                     noteList.noteList.first().let { defaultSelectedNote ->
-                        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, defaultSelectedNote)
+                        navigator.navigateTo(
+                            ListDetailPaneScaffoldRole.Detail, defaultSelectedNote
+                        )
                     }
                 }
             } else {
@@ -103,68 +105,90 @@ fun HomePane(
     ) {
         NavigationSuiteScaffold(
             navigationSuiteItems = {
-                AppDestinations.entries.forEach {
+                AppDestinations.entries.forEach { destination ->
+                    val isSelected = currentDestination == destination
                     item(
                         icon = {
                             Icon(
-                                it.icon,
-                                contentDescription = stringResource(it.contentDescription)
+                                destination.icon,
+                                contentDescription = stringResource(destination.contentDescription)
                             )
                         },
-                        label = { Text(stringResource(it.label)) },
-                        selected = currentDestination == it,
-                        onClick = { currentDestination = it }
+                        label = { Text(stringResource(destination.label)) },
+                        selected = isSelected,
+                        onClick = {
+                            if (currentDestination != destination) {
+                                currentDestination = destination
+                                if (destination != AppDestinations.HOME
+                                    && navigator.currentDestination?.pane ==
+                                    ListDetailPaneScaffoldRole.Detail
+                                ) {
+                                    homeScreenViewModel.clearSelection()
+                                }
+                            }
+                        }
                     )
                 }
             },
             content = {
-                ListDetailPaneScaffold(
-                    directive = navigator.scaffoldDirective,
-                    value = navigator.scaffoldValue,
-                    listPane = {
-                        ListPaneContent(
-                            noteList = noteList.noteList,
-                            onNoteClick = {
-                                coroutineScope.launch {
-                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)
+                when (currentDestination) {
+                    AppDestinations.HOME -> {
+                        ListDetailPaneScaffold(
+                            directive = navigator.scaffoldDirective,
+                            value = navigator.scaffoldValue,
+                            listPane = {
+                                ListPaneContent(
+                                    noteList = noteList.noteList,
+                                    onNoteClick = {
+                                        coroutineScope.launch {
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)
+                                        }
+                                        homeScreenViewModel.selectNote(it.id)
+                                    },
+                                    onAddNewTextNote = {
+                                        homeScreenViewModel.addNote { it ->
+                                            navigateToCanvas(it)
+                                        }
+                                    },
+                                    onAddNewDrawingNote = {
+                                        homeScreenViewModel.addDrawingNote { noteId ->
+                                            navigateToDrawingCanvas(noteId)
+                                        }
+                                    },
+                                    onDeleteNote = { note ->
+                                        homeScreenViewModel.deleteNote()
+                                        navigateUp()
+                                    },
+                                    onToggleFavorite = { noteId ->
+                                        homeScreenViewModel.toggleFavorite(noteId)
+                                    }
+                                )
+                            },
+                            detailPane = {
+                                selectedNoteUIState.note.let { note ->
+                                    DetailPaneContent(
+                                        note = note,
+                                        strokes = selectedNoteUIState.strokes,
+                                        onClickToEdit = {
+                                            if (note.type == NoteType.TEXT) {
+                                                navigateToCanvas(note.id)
+                                            } else {
+                                                navigateToDrawingCanvas(note.id)
+                                            }
+                                        }
+                                    )
                                 }
-                                homeScreenViewModel.selectNote(it.id)
-                            },
-                            onAddNewTextNote = {
-                                homeScreenViewModel.addNote { it ->
-                                    navigateToCanvas(it)
-                                }
-                            },
-                            onAddNewDrawingNote = {
-                                homeScreenViewModel.addDrawingNote { noteId ->
-                                    navigateToDrawingCanvas(noteId)
-                                }
-                            },
-                            onDeleteNote = { note ->
-                                homeScreenViewModel.deleteNote()
-                                navigateUp()
-                            },
-                            onToggleFavorite = { noteId ->
-                                homeScreenViewModel.toggleFavorite(noteId)
                             }
                         )
-                    },
-                    detailPane = {
-                        selectedNoteUIState.note.let { note ->
-                            DetailPaneContent(
-                                note = note,
-                                strokes = selectedNoteUIState.strokes,
-                                onClickToEdit = {
-                                    if (note.type == NoteType.TEXT) {
-                                        navigateToCanvas(note.id)
-                                    } else {
-                                        navigateToDrawingCanvas(note.id)
-                                    }
-                                }
-                            )
-                        }
                     }
-                )
+
+                    AppDestinations.SETTINGS -> {
+                        SettingsPane(
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
             }
         )
     }
